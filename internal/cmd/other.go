@@ -97,6 +97,10 @@ func init() {
 	restoreCmd.Flags().StringVarP(&restoreSource, "source", "s", "", "Source archive (.tar.gz.age)")
 	restoreCmd.Flags().StringVar(&restorePassphrase, "passphrase", "", "Decryption passphrase (or RANGKAI_PASSPHRASE)")
 	restoreCmd.Flags().BoolVar(&restoreForce, "force", false, "Overwrite an existing profile")
+	ejectCmd.Flags().StringVarP(&ejectProfile, "profile", "p", "personal", "Profile name")
+	ejectCmd.Flags().StringVar(&ejectSecrets, "secrets", "", "Secrets directory (default $HOME/secrets-central)")
+	ejectCmd.Flags().BoolVar(&ejectDryRun, "dry-run", false, "List without deleting")
+	ejectCmd.Flags().BoolVar(&ejectYes, "yes", false, "Actually delete (without this, dry-run)")
 }
 
 var (
@@ -142,11 +146,39 @@ var updateCmd = &cobra.Command{
 	},
 }
 
+var (
+	ejectProfile string
+	ejectSecrets string
+	ejectDryRun  bool
+	ejectYes     bool
+)
+
 var ejectCmd = &cobra.Command{
 	Use:   "eject",
-	Short: "Eject config as plain files (no lock-in)",
+	Short: "Wipe the installed environment and secrets from this machine",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("📤 Ejecting config... (stub)")
+		home, _ := os.UserHomeDir()
+		secrets := ejectSecrets
+		if secrets == "" {
+			secrets = filepath.Join(home, "secrets-central")
+		}
+		dry := ejectDryRun || !ejectYes
+		rep, err := pack.Eject(ejectProfile, home, secrets, dry)
+		if err != nil {
+			return err
+		}
+		if dry {
+			fmt.Println("DRY RUN (use --yes to actually remove). Would remove:")
+		} else {
+			fmt.Println("Removed:")
+		}
+		for _, r := range rep.Removed {
+			fmt.Println("  " + r)
+		}
+		fmt.Println("Residue this tool cannot remove (informational):")
+		for _, r := range rep.Residue {
+			fmt.Println("  - " + r)
+		}
 		return nil
 	},
 }
