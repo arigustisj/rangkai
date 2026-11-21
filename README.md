@@ -1,6 +1,6 @@
 <div align="center">
 
-# Rangkai
+<img src="assets/rangkai-wordmark.svg" alt="Rangkai" width="560">
 
 **One command to a ready-to-use AI coding environment for Hermes and Claude Code.**
 
