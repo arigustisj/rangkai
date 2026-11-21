@@ -37,4 +37,6 @@ func init() {
 	rootCmd.AddCommand(restoreCmd)
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(ejectCmd)
+	rootCmd.AddCommand(pushCmd)
+	rootCmd.AddCommand(pullCmd)
 }

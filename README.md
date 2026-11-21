@@ -54,6 +54,8 @@ Status legend: **Ready** means implemented, **Stub** means a placeholder still p
 | `restore` | Restore a personal environment from an encrypted archive | Ready |
 | `update` | Update Hermes, skills, and MCP servers | Stub |
 | `eject` | Wipe the installed environment and secrets from this machine | Ready |
+| `push` | Encrypt and upload the environment to a private hub over SSH | Ready |
+| `pull` | Download and restore the environment from a private hub | Ready |
 | `pack export` | Export a shareable, sanitized pack | Ready |
 | `pack import` | Import a pack into a target profile | Ready |
 | `pack sanitize` | Strip credentials and replace sensitive patterns | Ready |
@@ -88,11 +90,25 @@ RANGKAI_PASSPHRASE='your-passphrase' ./bin/rangkai restore --source carry.tar.gz
 
 The archive is age ciphertext and the passphrase never leaves your machine. `restore` decrypts fully before writing, refuses to overwrite an existing profile without `--force`, and rejects path traversal. `eject` removes only the resolved profile and secrets directories, never `$HOME`, and reports residue it cannot control (shell history, swap, host logs).
 
-This is the manual-carry MVP. Automatic hub sync and a one-line install are on the roadmap.
+This is the manual-carry flow. To sync without carrying the file yourself, use `push`/`pull` with a private hub (below). A one-line install is on the roadmap.
+
+## Hub sync: move between machines automatically
+
+`push` and `pull` sync the encrypted archive with a private hub over SSH (for example a server reachable only on your Tailscale network). The hub stores only ciphertext; the passphrase never leaves your machine.
+
+```bash
+# Old machine: encrypt and upload
+RANGKAI_PASSPHRASE='your-passphrase' ./bin/rangkai push --hub your-hub:rangkai-hub --profile personal
+
+# New machine: download and restore
+RANGKAI_PASSPHRASE='your-passphrase' ./bin/rangkai pull --hub your-hub:rangkai-hub --profile personal
+```
+
+`--hub` is an SCP target (`ssh-host:path`); an ssh_config alias works. `push` creates the hub directory if needed. `pull` inherits the restore guards: decrypt-first, `--force` to overwrite, path-traversal rejection. SSH runs in BatchMode with trust-on-first-use host keys and fails closed.
 
 ## Environment variables
 
-- `RANGKAI_PASSPHRASE` (optional): passphrase for `backup` and `restore`, as an alternative to `--passphrase`.
+- `RANGKAI_PASSPHRASE` (optional): passphrase for `backup`, `restore`, `push`, and `pull`, as an alternative to `--passphrase`.
 
 Rangkai reads `HOME` to locate where the profile is written.
 
@@ -100,7 +116,6 @@ Rangkai reads `HOME` to locate where the profile is written.
 
 - Fill in the remaining stub commands: `doctor`, `switch-model`, `update`.
 - A one-line install script at `0xlzy.tech/install/rangkai` (planned, not yet available). Build from source for now.
-- Private hub sync for the encrypted personal archive, so a setup moves between machines automatically.
 - Layered public/private pack export with a sanitize lint for sharing.
 
 ## Contributing
