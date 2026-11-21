@@ -17,6 +17,7 @@ type Manifest struct {
 	MemoryFiles     []string            `json:"memory_files"`
 	MCPServers      []string            `json:"mcp_servers"`
 	Hooks           []string            `json:"hooks"`
+	Files           []string            `json:"files,omitempty"`
 	Checksum        string              `json:"checksum,omitempty"`
 }
 
@@ -40,6 +41,7 @@ func NewManifest(sourceProfile, sourceAgent string) *Manifest {
 		MemoryFiles:     []string{},
 		MCPServers:      []string{},
 		Hooks:           []string{},
+		Files:           []string{},
 	}
 }
 
