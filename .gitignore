@@ -1,0 +1,44 @@
+# Binaries
+bin/
+/rangkai
+*.exe
+
+# Go
+vendor/
+go.work
+
+# Hermes config (generated)
+.hermes/profiles/*/config.yaml
+.hermes/profiles/*/memory/
+.hermes/profiles/*/sessions/
+.hermes/profiles/*/cache/
+
+# Environment
+.env
+.env.local
+*.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test output
+coverage.out
+*.test
+
+# Backup files
+*.bak
+*.backup
+rangkai-backup-*.tar.gz
+# env files: keep only the example
+.env*
+!.env.example
