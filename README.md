@@ -50,10 +50,10 @@ Status legend: **Ready** means implemented, **Stub** means a placeholder still p
 | `remove-mcp` | Remove an MCP server from the profile | Ready |
 | `sync-mcp` | Sync core MCP servers | Ready |
 | `switch-model` | Change the active model | Stub |
-| `backup` | Back up profile, memory, and skills | Stub |
-| `restore` | Restore from a backup | Stub |
+| `backup` | Back up the full personal environment to an encrypted archive | Ready |
+| `restore` | Restore a personal environment from an encrypted archive | Ready |
 | `update` | Update Hermes, skills, and MCP servers | Stub |
-| `eject` | Export config as plain files, no lock-in | Stub |
+| `eject` | Wipe the installed environment and secrets from this machine | Ready |
 | `pack export` | Export a shareable, sanitized pack | Ready |
 | `pack import` | Import a pack into a target profile | Ready |
 | `pack sanitize` | Strip credentials and replace sensitive patterns | Ready |
@@ -71,15 +71,37 @@ A pack is a portable archive of a working environment.
 
 Personal memory and credentials never belong in a shareable pack. Keep them in `memory/` (gitignored) and in the source profile's private settings.
 
+## Carry your environment between machines
+
+`backup`, `restore`, and `eject` move a whole personal environment (profile, memory, skills, secrets, and SSOT) as one age-encrypted archive.
+
+```bash
+# Old machine: encrypt everything into one archive
+RANGKAI_PASSPHRASE='your-passphrase' ./bin/rangkai backup --profile personal --output carry.tar.gz.age
+
+# Carry carry.tar.gz.age to the new machine, then:
+RANGKAI_PASSPHRASE='your-passphrase' ./bin/rangkai restore --source carry.tar.gz.age
+
+# Wipe the old machine (dry-run by default; add --yes to actually delete)
+./bin/rangkai eject --profile personal --yes
+```
+
+The archive is age ciphertext and the passphrase never leaves your machine. `restore` decrypts fully before writing, refuses to overwrite an existing profile without `--force`, and rejects path traversal. `eject` removes only the resolved profile and secrets directories, never `$HOME`, and reports residue it cannot control (shell history, swap, host logs).
+
+This is the manual-carry MVP. Automatic hub sync and a one-line install are on the roadmap.
+
 ## Environment variables
 
-None required. Rangkai reads `HOME` to locate where the profile is written.
+- `RANGKAI_PASSPHRASE` (optional): passphrase for `backup` and `restore`, as an alternative to `--passphrase`.
+
+Rangkai reads `HOME` to locate where the profile is written.
 
 ## Roadmap
 
-- Fill in the stub commands: `doctor`, `switch-model`, `backup`, `restore`, `update`, `eject`.
+- Fill in the remaining stub commands: `doctor`, `switch-model`, `update`.
 - A one-line install script at `0xlzy.tech/install/rangkai` (planned, not yet available). Build from source for now.
-- Encrypted personal packs with private hub sync, so a setup moves between machines without losing memory.
+- Private hub sync for the encrypted personal archive, so a setup moves between machines automatically.
+- Layered public/private pack export with a sanitize lint for sharing.
 
 ## Contributing
 
