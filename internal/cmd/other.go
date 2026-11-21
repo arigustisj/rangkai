@@ -94,14 +94,41 @@ func init() {
 	backupCmd.Flags().StringVar(&backupSSOT, "ssot", "", "SSOT directory (default $HOME/Dev/00-system)")
 	backupCmd.Flags().StringVarP(&backupOutput, "output", "o", "", "Output archive (.tar.gz.age)")
 	backupCmd.Flags().StringVar(&backupPassphrase, "passphrase", "", "Encryption passphrase (or RANGKAI_PASSPHRASE)")
+	restoreCmd.Flags().StringVarP(&restoreSource, "source", "s", "", "Source archive (.tar.gz.age)")
+	restoreCmd.Flags().StringVar(&restorePassphrase, "passphrase", "", "Decryption passphrase (or RANGKAI_PASSPHRASE)")
+	restoreCmd.Flags().BoolVar(&restoreForce, "force", false, "Overwrite an existing profile")
 }
 
+var (
+	restoreSource     string
+	restorePassphrase string
+	restoreForce      bool
+)
+
 var restoreCmd = &cobra.Command{
-	Use:   "restore [backup-file]",
-	Short: "Restore from backup",
-	Args:  cobra.ExactArgs(1),
+	Use:   "restore",
+	Short: "Restore a personal environment from an encrypted archive",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("📥 Restoring from: %s (stub)\n", args[0])
+		pass := restorePassphrase
+		if pass == "" {
+			pass = os.Getenv("RANGKAI_PASSPHRASE")
+		}
+		if pass == "" {
+			return fmt.Errorf("passphrase required (--passphrase or RANGKAI_PASSPHRASE)")
+		}
+		if restoreSource == "" {
+			return fmt.Errorf("source archive required (--source)")
+		}
+		f, err := os.Open(restoreSource)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		home, _ := os.UserHomeDir()
+		if err := pack.RestorePersonal(f, pass, home, restoreForce); err != nil {
+			return fmt.Errorf("restore failed: %w", err)
+		}
+		fmt.Println("Environment restored.")
 		return nil
 	},
 }
