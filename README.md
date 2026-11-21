@@ -1,67 +1,90 @@
+<div align="center">
+
 # Rangkai
 
-A command line tool that builds a ready-to-use AI coding environment for Hermes or Claude Code: skills, MCP servers, hooks and model settings, set up with one command.
+**One command to a ready-to-use AI coding environment for Hermes and Claude Code.**
 
-## What it is
+[![License: MIT](https://img.shields.io/github/license/arigustisj/rangkai?color=blue)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/arigustisj/rangkai)](https://goreportcard.com/report/github.com/arigustisj/rangkai)
+[![Go 1.25+](https://img.shields.io/badge/go-1.25%2B-00ADD8?logo=go&logoColor=white)](go.mod)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
-`rangkai init` writes a complete Hermes profile (config, install script, verify script) for a chosen stack and model. Other commands add or remove skills and MCP servers, switch the model, check health, back up and restore a profile, and export a profile as a shareable pack.
+</div>
 
-## Requirements
+---
 
-- Go 1.25 or newer
-- Hermes Agent, to use the profiles it creates
+Rangkai writes a complete agent profile for your stack and model: config, install script, and verify script. From there you add skills, wire MCP servers, set hooks, and route models. When the setup works, export it as a pack and hand it to a teammate. That replaces hand-assembling directories and copy-pasting config files.
 
-## Run locally
+## Quickstart
 
 ```bash
 git clone https://github.com/arigustisj/rangkai
 cd rangkai
-make build                       # builds bin/rangkai from ./cmd/rangkai
+make build
 ./bin/rangkai init --profile personal --stack go --model openrouter:nemotron
 ./bin/rangkai verify
 ```
 
-`cmd/rangkai/main.go` is part of this repository, so `make build` works out of the box.
+`make build` works out of the box. The entry point lives at `cmd/rangkai/main.go`.
+
+## Requirements
+
+- Go 1.25 or newer
+- Hermes Agent, to run the profiles Rangkai creates
 
 ## Commands
 
-| Command | Status |
-|---------|--------|
-| `init` | Implemented |
-| `verify` | Implemented |
-| `doctor` | Stub |
-| `add-skill` | Implemented |
-| `list-skills` | Implemented |
-| `remove-skill` | Implemented |
-| `sync-skills` | Implemented |
-| `add-mcp` | Implemented |
-| `list-mcp` | Implemented |
-| `remove-mcp` | Implemented |
-| `sync-mcp` | Implemented |
-| `switch-model` | Stub |
-| `backup` | Stub |
-| `restore` | Stub |
-| `update` | Stub |
-| `eject` | Stub |
-| `pack export` | Implemented |
-| `pack import` | Implemented |
-| `pack sanitize` | Implemented |
-| `pack onboard` | Implemented |
+Status legend: **Ready** means implemented, **Stub** means a placeholder still pending implementation.
+
+| Command | What it does | Status |
+| --- | --- | :---: |
+| `init` | Create a profile with config, install and verify scripts | Ready |
+| `verify` | Health-check a profile | Ready |
+| `doctor` | Diagnose and fix environment issues | Stub |
+| `add-skill` | Link a skill into the profile | Ready |
+| `list-skills` | List installed and available skills | Ready |
+| `remove-skill` | Remove a skill from the profile | Ready |
+| `sync-skills` | Sync core skills for the chosen stack | Ready |
+| `add-mcp` | Wire an MCP server into the profile | Ready |
+| `list-mcp` | List installed and available MCP servers | Ready |
+| `remove-mcp` | Remove an MCP server from the profile | Ready |
+| `sync-mcp` | Sync core MCP servers | Ready |
+| `switch-model` | Change the active model | Stub |
+| `backup` | Back up profile, memory, and skills | Stub |
+| `restore` | Restore from a backup | Stub |
+| `update` | Update Hermes, skills, and MCP servers | Stub |
+| `eject` | Export config as plain files, no lock-in | Stub |
+| `pack export` | Export a shareable, sanitized pack | Ready |
+| `pack import` | Import a pack into a target profile | Ready |
+| `pack sanitize` | Strip credentials and replace sensitive patterns | Ready |
+| `pack onboard` | Onboard a new team member from a pack | Ready |
+
+Run `rangkai <command> -h` for flags. `init` takes `--profile` (personal, team-member, ci-bot), `--stack` (go, node, laravel, python), `--model` (`openrouter:...`, `ollama:...`, `vllm:...`), `--server`, `--shared-skills`, `--variant`, and `--force`.
+
+## Packs: share the setup, keep the secrets
+
+A pack is a portable archive of a working environment.
+
+- `pack export` produces a **shareable** pack: sanitized structure, skills, hooks, and a public config template. Safe to distribute.
+- `pack import` applies a pack to a **target** profile.
+- `pack sanitize` strips credentials and replaces sensitive patterns before anything leaves your machine.
+
+Personal memory and credentials never belong in a shareable pack. Keep them in `memory/` (gitignored) and in the source profile's private settings.
 
 ## Environment variables
 
-None are needed. The tool only reads `HOME` to find where to write the profile.
+None required. Rangkai reads `HOME` to locate where the profile is written.
 
-## Pack guidelines (public vs private)
+## Roadmap
 
-- `pack export` exports a **shareable** pack. The exported archive contains the sanitized structure (skills, hooks, public config template) and is safe to distribute.
-- `pack import` imports the pack into a **target** profile.
-- Personal memory and credentials must NOT go into the shareable pack. Keep them in `memory/` (usually `.gitignore`d) and in the source profile's private settings.
+- Fill in the stub commands: `doctor`, `switch-model`, `backup`, `restore`, `update`, `eject`.
+- A one-line install script at `0xlzy.tech/install/rangkai` (planned, not yet available). Build from source for now.
+- Encrypted personal packs with private hub sync, so a setup moves between machines without losing memory.
 
-## Install (once)
+## Contributing
 
-The one-time install script URL (0xlzy.tech/install/rangkai) is planned but not yet available. Build and use the binary locally instead.
+Issues and pull requests are welcome. Run `make test` and `make lint` before opening a PR.
 
 ## License
 
-MIT — Copyright (c) Rangkai contributors
+MIT. Copyright (c) Rangkai contributors. See [LICENSE](LICENSE).
