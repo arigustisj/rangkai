@@ -4,36 +4,59 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/arigustisj/rangkai/internal/config"
 	"github.com/arigustisj/rangkai/internal/pack"
 	"github.com/spf13/cobra"
 )
+
+var doctorProfile string
 
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Diagnose and fix environment issues",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("🏥 Running diagnostics... (stub)")
+		home, _ := os.UserHomeDir()
+		dir := filepath.Join(home, ".hermes", "profiles", doctorProfile)
+		fmt.Println("🏥 Running diagnostics...")
+		failed := 0
+		for _, c := range config.Diagnose(dir) {
+			status := "PASS"
+			if !c.OK {
+				status = "FAIL"
+				failed++
+			}
+			fmt.Printf("   [%s] %s: %s\n", status, c.Name, c.Detail)
+		}
+		if failed > 0 {
+			return fmt.Errorf("%d check(s) failed", failed)
+		}
+		fmt.Println("✅ All checks passed")
 		return nil
 	},
 }
 
-var addMCPcmd = &cobra.Command{
-	Use:   "add-mcp [name]",
-	Short: "Add an MCP server",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("🔌 Adding MCP: %s (stub)\n", args[0])
-		return nil
-	},
-}
+var switchModelProfile string
 
 var switchModelCmd = &cobra.Command{
 	Use:   "switch-model [provider:model]",
 	Short: "Switch the active model",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("🔄 Switching model to: %s (stub)\n", args[0])
+		m := args[0]
+		if !strings.Contains(m, ":") {
+			return fmt.Errorf("model must be provider:model (got %q)", m)
+		}
+		home, _ := os.UserHomeDir()
+		p := filepath.Join(home, ".hermes", "profiles", switchModelProfile, "config.yaml")
+		if _, err := os.Stat(p); err != nil {
+			return fmt.Errorf("profile config not found: %s (run rangkai init first)", p)
+		}
+		if err := config.UpdateModel(p, m); err != nil {
+			return fmt.Errorf("switch model: %w", err)
+		}
+		fmt.Printf("✅ Model switched to %s\n", m)
 		return nil
 	},
 }
@@ -101,6 +124,9 @@ func init() {
 	ejectCmd.Flags().StringVar(&ejectSecrets, "secrets", "", "Secrets directory (default $HOME/secrets-central)")
 	ejectCmd.Flags().BoolVar(&ejectDryRun, "dry-run", false, "List without deleting")
 	ejectCmd.Flags().BoolVar(&ejectYes, "yes", false, "Actually delete (without this, dry-run)")
+	switchModelCmd.Flags().StringVarP(&switchModelProfile, "profile", "p", "personal", "Profile name")
+	doctorCmd.Flags().StringVarP(&doctorProfile, "profile", "p", "personal", "Profile name")
+	updateCmd.Flags().StringVarP(&updateProfile, "profile", "p", "personal", "Profile name")
 }
 
 var (
@@ -137,13 +163,39 @@ var restoreCmd = &cobra.Command{
 	},
 }
 
+var updateProfile string
+
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update Hermes, skills, and MCP servers",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("⬆️ Updating... (stub)")
+		home, _ := os.UserHomeDir()
+		targetDir := filepath.Join(home, ".hermes", "profiles", updateProfile)
+		cfgPath := filepath.Join(targetDir, "config.yaml")
+		cfg, err := config.ReadProfile(cfgPath)
+		if err != nil {
+			return fmt.Errorf("cannot read profile config %s: %w", cfgPath, err)
+		}
+		cfg.HomeDir = home
+		cfg.Variant = inferVariant(targetDir)
+		fmt.Printf("⬆️ Updating profile '%s' (stack %s, model %s)...\n", cfg.ProfileName, cfg.Stack, cfg.Model)
+		if err := generateProfile(cfg, targetDir, ""); err != nil {
+			return err
+		}
+		fmt.Println("✅ Profile refreshed. Sync skills/MCP with: rangkai sync-skills / rangkai sync-mcp")
 		return nil
 	},
+}
+
+// inferVariant derives the variant from the profile's directory layout.
+func inferVariant(dir string) string {
+	if _, err := os.Stat(filepath.Join(dir, "skills", "shared")); err == nil {
+		return "team-member"
+	}
+	if _, err := os.Stat(filepath.Join(dir, "data", "kanban")); err != nil {
+		return "ci-bot"
+	}
+	return "personal"
 }
 
 var (
