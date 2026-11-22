@@ -168,8 +168,7 @@ Rangkai reads `HOME` to locate where the profile is written.
 
 ## Roadmap
 
-- Encrypted workspace + crypto-erase eject.
-- Fresh-machine bootstrap (Tailscale auth + SSH key for `pull`).
+- Encrypted workspace + crypto-erase eject (deferred; `eject` already wipes the profile + secrets and reports residue).
 
 ## Contributing
 
