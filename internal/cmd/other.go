@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/arigustisj/rangkai/internal/config"
 	"github.com/arigustisj/rangkai/internal/pack"
 	"github.com/spf13/cobra"
 )
@@ -28,12 +30,26 @@ var addMCPcmd = &cobra.Command{
 	},
 }
 
+var switchModelProfile string
+
 var switchModelCmd = &cobra.Command{
 	Use:   "switch-model [provider:model]",
 	Short: "Switch the active model",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("🔄 Switching model to: %s (stub)\n", args[0])
+		m := args[0]
+		if !strings.Contains(m, ":") {
+			return fmt.Errorf("model must be provider:model (got %q)", m)
+		}
+		home, _ := os.UserHomeDir()
+		p := filepath.Join(home, ".hermes", "profiles", switchModelProfile, "config.yaml")
+		if _, err := os.Stat(p); err != nil {
+			return fmt.Errorf("profile config not found: %s (run rangkai init first)", p)
+		}
+		if err := config.UpdateModel(p, m); err != nil {
+			return fmt.Errorf("switch model: %w", err)
+		}
+		fmt.Printf("✅ Model switched to %s\n", m)
 		return nil
 	},
 }
@@ -101,6 +117,7 @@ func init() {
 	ejectCmd.Flags().StringVar(&ejectSecrets, "secrets", "", "Secrets directory (default $HOME/secrets-central)")
 	ejectCmd.Flags().BoolVar(&ejectDryRun, "dry-run", false, "List without deleting")
 	ejectCmd.Flags().BoolVar(&ejectYes, "yes", false, "Actually delete (without this, dry-run)")
+	switchModelCmd.Flags().StringVarP(&switchModelProfile, "profile", "p", "personal", "Profile name")
 }
 
 var (
