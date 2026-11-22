@@ -11,12 +11,15 @@ import (
 )
 
 var (
-	packProfile string
-	packAgent   string
-	packOutput  string
-	packSource  string
-	packDryRun  bool
-	packRules   string
+	packProfile     string
+	packAgent       string
+	packOutput      string
+	packSource      string
+	packDryRun      bool
+	packRules       string
+	packWithMemory  bool
+	packWithSecrets bool
+	packWithSSOT    bool
 )
 
 // packReferenceProfile is the reference profile used for linking skills.
@@ -55,9 +58,22 @@ var packExportCmd = &cobra.Command{
 		sanitizer := pack.NewSanitizer(pack.DefaultSanitizeRules(), pack.NewManifest(packProfile, packAgent))
 		manifest := pack.NewManifest(packProfile, packAgent)
 
-		exporter := pack.NewExporter(packProfile, packAgent, packOutput, sanitizer, manifest, registry)
+		opts := pack.DefaultExportOptions()
+		if packWithMemory {
+			opts.Layers = append(opts.Layers, pack.LayerMemory)
+		}
+		if packWithSecrets {
+			opts.Layers = append(opts.Layers, pack.LayerSecrets)
+		}
+		if packWithSSOT {
+			opts.Layers = append(opts.Layers, pack.LayerSSOT)
+		}
+		exporter := pack.NewExporterWithOptions(packProfile, packAgent, packOutput, sanitizer, manifest, registry, opts)
 
 		fmt.Printf("📦 Exporting pack from profile '%s' (%s)...\n", packProfile, packAgent)
+		if packWithMemory || packWithSecrets || packWithSSOT {
+			fmt.Println("⚠️  Private layers included — do NOT share this pack publicly.")
+		}
 
 		if err := exporter.Export(); err != nil {
 			return fmt.Errorf("export failed: %w", err)
@@ -186,6 +202,9 @@ func init() {
 	packExportCmd.Flags().StringVarP(&packProfile, "profile", "p", "personal", "Source profile name")
 	packExportCmd.Flags().StringVar(&packAgent, "agent", "hermes", "Source agent (hermes, claude-code, cursor)")
 	packExportCmd.Flags().StringVarP(&packOutput, "output", "o", "", "Output pack file (.tar.gz)")
+	packExportCmd.Flags().BoolVar(&packWithMemory, "with-memory", false, "Include personal memory (private layer)")
+	packExportCmd.Flags().BoolVar(&packWithSecrets, "with-secrets", false, "Include secrets-central (private layer)")
+	packExportCmd.Flags().BoolVar(&packWithSSOT, "with-ssot", false, "Include personal SSOT (private layer)")
 
 	packImportCmd.Flags().StringVarP(&packProfile, "profile", "p", "personal", "Target profile name")
 	packImportCmd.Flags().StringVar(&packAgent, "agent", "hermes", "Target agent (hermes, claude-code, cursor)")
