@@ -164,3 +164,26 @@ func Diagnose(profileDir string) []Check {
 
 	return out
 }
+
+// ReadProfile parses a profile's config.yaml back into a ProfileConfig.
+func ReadProfile(configPath string) (ProfileConfig, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return ProfileConfig{}, err
+	}
+	s := string(data)
+	cfg := ProfileConfig{}
+	for _, ln := range strings.Split(s, "\n") {
+		if strings.HasPrefix(ln, "# Profile:") {
+			cfg.ProfileName = strings.TrimSpace(strings.TrimPrefix(ln, "# Profile:"))
+		}
+		if strings.HasPrefix(ln, "# Stack:") {
+			cfg.Stack = strings.TrimSpace(strings.TrimPrefix(ln, "# Stack:"))
+		}
+	}
+	cfg.Model = modelProvider(s)
+	if cfg.ProfileName == "" || cfg.Stack == "" || cfg.Model == "" {
+		return ProfileConfig{}, fmt.Errorf("incomplete profile config: %s", configPath)
+	}
+	return cfg, nil
+}

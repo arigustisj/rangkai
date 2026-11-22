@@ -69,59 +69,8 @@ Examples:
 			Variant:     variant,
 		}
 
-		// Generate config.yaml
-		configYAML, err := config.GenerateConfig(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to generate config: %w", err)
-		}
-		configPath := filepath.Join(targetDir, "config.yaml")
-		if err := os.WriteFile(configPath, []byte(configYAML), 0644); err != nil {
-			return fmt.Errorf("failed to write config.yaml: %w", err)
-		}
-		fmt.Printf("   ✓ Generated config.yaml\n")
-
-		// Generate install.sh
-		installScript, err := config.GenerateInstallScript(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to generate install.sh: %w", err)
-		}
-		installPath := filepath.Join(targetDir, "install.sh")
-		if err := os.WriteFile(installPath, []byte(installScript), 0755); err != nil {
-			return fmt.Errorf("failed to write install.sh: %w", err)
-		}
-		fmt.Printf("   ✓ Generated install.sh\n")
-
-		// Generate verify.sh
-		verifyScript, err := config.GenerateVerifyScript(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to generate verify.sh: %w", err)
-		}
-		verifyPath := filepath.Join(targetDir, "verify.sh")
-		if err := os.WriteFile(verifyPath, []byte(verifyScript), 0755); err != nil {
-			return fmt.Errorf("failed to write verify.sh: %w", err)
-		}
-		fmt.Printf("   ✓ Generated verify.sh\n")
-
-		// Generate .env.example (variant-specific)
-		envExample := generateEnvExample(variant)
-		envPath := filepath.Join(targetDir, ".env.example")
-		if err := os.WriteFile(envPath, []byte(envExample), 0644); err != nil {
-			return fmt.Errorf("failed to write .env.example: %w", err)
-		}
-		fmt.Printf("   ✓ Generated .env.example\n")
-
-		// Generate git hooks (variant-specific)
-		if err := generateHooks(targetDir, variant); err != nil {
-			return fmt.Errorf("failed to generate hooks: %w", err)
-		}
-		fmt.Printf("   ✓ Generated git hooks\n")
-
-		// If team-member with shared skills, generate skill sync script
-		if variant == "team-member" && initSharedSkills != "" {
-			if err := generateSkillSyncScript(targetDir, initSharedSkills); err != nil {
-				return fmt.Errorf("failed to generate skill sync script: %w", err)
-			}
-			fmt.Printf("   ✓ Generated skill-sync.sh\n")
+		if err := generateProfile(cfg, targetDir, initSharedSkills); err != nil {
+			return err
 		}
 
 		fmt.Println("\n✅ Rangkai environment initialized!")
@@ -139,6 +88,54 @@ Examples:
 
 		return nil
 	},
+}
+
+func generateProfile(cfg config.ProfileConfig, targetDir, sharedSkills string) error {
+	configYAML, err := config.GenerateConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to generate config: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "config.yaml"), []byte(configYAML), 0644); err != nil {
+		return fmt.Errorf("failed to write config.yaml: %w", err)
+	}
+	fmt.Printf("   ✓ Generated config.yaml\n")
+
+	installScript, err := config.GenerateInstallScript(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to generate install.sh: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "install.sh"), []byte(installScript), 0755); err != nil {
+		return fmt.Errorf("failed to write install.sh: %w", err)
+	}
+	fmt.Printf("   ✓ Generated install.sh\n")
+
+	verifyScript, err := config.GenerateVerifyScript(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to generate verify.sh: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "verify.sh"), []byte(verifyScript), 0755); err != nil {
+		return fmt.Errorf("failed to write verify.sh: %w", err)
+	}
+	fmt.Printf("   ✓ Generated verify.sh\n")
+
+	envExample := generateEnvExample(cfg.Variant)
+	if err := os.WriteFile(filepath.Join(targetDir, ".env.example"), []byte(envExample), 0644); err != nil {
+		return fmt.Errorf("failed to write .env.example: %w", err)
+	}
+	fmt.Printf("   ✓ Generated .env.example\n")
+
+	if err := generateHooks(targetDir, cfg.Variant); err != nil {
+		return fmt.Errorf("failed to generate hooks: %w", err)
+	}
+	fmt.Printf("   ✓ Generated git hooks\n")
+
+	if cfg.Variant == "team-member" && sharedSkills != "" {
+		if err := generateSkillSyncScript(targetDir, sharedSkills); err != nil {
+			return fmt.Errorf("failed to generate skill sync script: %w", err)
+		}
+		fmt.Printf("   ✓ Generated skill-sync.sh\n")
+	}
+	return nil
 }
 
 func generateEnvExample(variant string) string {

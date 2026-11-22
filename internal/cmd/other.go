@@ -136,6 +136,7 @@ func init() {
 	ejectCmd.Flags().BoolVar(&ejectYes, "yes", false, "Actually delete (without this, dry-run)")
 	switchModelCmd.Flags().StringVarP(&switchModelProfile, "profile", "p", "personal", "Profile name")
 	doctorCmd.Flags().StringVarP(&doctorProfile, "profile", "p", "personal", "Profile name")
+	updateCmd.Flags().StringVarP(&updateProfile, "profile", "p", "personal", "Profile name")
 }
 
 var (
@@ -172,13 +173,39 @@ var restoreCmd = &cobra.Command{
 	},
 }
 
+var updateProfile string
+
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update Hermes, skills, and MCP servers",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("⬆️ Updating... (stub)")
+		home, _ := os.UserHomeDir()
+		targetDir := filepath.Join(home, ".hermes", "profiles", updateProfile)
+		cfgPath := filepath.Join(targetDir, "config.yaml")
+		cfg, err := config.ReadProfile(cfgPath)
+		if err != nil {
+			return fmt.Errorf("cannot read profile config %s: %w", cfgPath, err)
+		}
+		cfg.HomeDir = home
+		cfg.Variant = inferVariant(targetDir)
+		fmt.Printf("⬆️ Updating profile '%s' (stack %s, model %s)...\n", cfg.ProfileName, cfg.Stack, cfg.Model)
+		if err := generateProfile(cfg, targetDir, ""); err != nil {
+			return err
+		}
+		fmt.Println("✅ Profile refreshed. Sync skills/MCP with: rangkai sync-skills / rangkai sync-mcp")
 		return nil
 	},
+}
+
+// inferVariant derives the variant from the profile's directory layout.
+func inferVariant(dir string) string {
+	if _, err := os.Stat(filepath.Join(dir, "skills", "shared")); err == nil {
+		return "team-member"
+	}
+	if _, err := os.Stat(filepath.Join(dir, "data", "kanban")); err != nil {
+		return "ci-bot"
+	}
+	return "personal"
 }
 
 var (
