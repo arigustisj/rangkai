@@ -133,6 +133,11 @@ func (i *Importer) extractTarGz() (string, error) {
 				return "", err
 			}
 			outFile.Close()
+			// Restore the archived permission bits (os.Create defaults to 0666).
+			if err := os.Chmod(targetPath, os.FileMode(header.Mode).Perm()); err != nil {
+				os.RemoveAll(tmpDir)
+				return "", err
+			}
 		}
 	}
 
