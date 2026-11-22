@@ -12,6 +12,42 @@ import (
 	"github.com/arigustisj/rangkai/internal/skill"
 )
 
+// Layer identifies a pack layer. Structure is always exported; the rest are opt-in.
+type Layer string
+
+const (
+	LayerStructure Layer = "structure"
+	LayerMemory    Layer = "memory"
+	LayerSecrets   Layer = "secrets"
+	LayerSSOT      Layer = "ssot"
+)
+
+// ExportOptions selects which layers an export includes.
+type ExportOptions struct {
+	Layers []Layer
+}
+
+// Has reports whether a layer is enabled.
+func (o ExportOptions) Has(l Layer) bool {
+	for _, x := range o.Layers {
+		if x == l {
+			return true
+		}
+	}
+	return false
+}
+
+// DefaultExportOptions returns the shareable default: structure only.
+func DefaultExportOptions() ExportOptions {
+	return ExportOptions{Layers: []Layer{LayerStructure}}
+}
+
+// MethodologyMemory lists the memory files that belong to the structure layer.
+var MethodologyMemory = []string{
+	"conventions.md", "server-map.md", "git-rules.md",
+	"deploy-patterns.md", "agent-rules.md", "mcp-registry.md",
+}
+
 type Exporter struct {
 	SourceProfile string
 	SourceAgent   string
@@ -19,9 +55,26 @@ type Exporter struct {
 	Sanitizer     *Sanitizer
 	Manifest      *Manifest
 	SkillRegistry *skill.SkillRegistry
+	Options       ExportOptions
+	// Home overrides home directory resolution when non-empty (tests).
+	Home string
 }
 
+// home resolves the home directory, honoring the Home test seam.
+func (e *Exporter) home() string {
+	if e.Home != "" {
+		return e.Home
+	}
+	h, _ := os.UserHomeDir()
+	return h
+}
+
+// NewExporter keeps the historical behaviour: structure + memory.
 func NewExporter(sourceProfile, sourceAgent, outputPath string, sanitizer *Sanitizer, manifest *Manifest, registry *skill.SkillRegistry) *Exporter {
+	return NewExporterWithOptions(sourceProfile, sourceAgent, outputPath, sanitizer, manifest, registry, ExportOptions{Layers: []Layer{LayerStructure, LayerMemory}})
+}
+
+func NewExporterWithOptions(sourceProfile, sourceAgent, outputPath string, sanitizer *Sanitizer, manifest *Manifest, registry *skill.SkillRegistry, opts ExportOptions) *Exporter {
 	return &Exporter{
 		SourceProfile: sourceProfile,
 		SourceAgent:   sourceAgent,
@@ -29,6 +82,7 @@ func NewExporter(sourceProfile, sourceAgent, outputPath string, sanitizer *Sanit
 		Sanitizer:     sanitizer,
 		Manifest:      manifest,
 		SkillRegistry: registry,
+		Options:       opts,
 	}
 }
 
@@ -45,9 +99,23 @@ func (e *Exporter) Export() error {
 		return fmt.Errorf("export skills: %w", err)
 	}
 
-	// Export memory
-	if err := e.exportMemory(tmpDir); err != nil {
+	// Export memory (structure methodology files always; personal memory opt-in)
+	if err := e.exportMemory(tmpDir, e.Options.Has(LayerMemory)); err != nil {
 		return fmt.Errorf("export memory: %w", err)
+	}
+
+	// Export secrets (opt-in, private)
+	if e.Options.Has(LayerSecrets) {
+		if err := e.exportSecrets(tmpDir); err != nil {
+			return fmt.Errorf("export secrets: %w", err)
+		}
+	}
+
+	// Export SSOT (opt-in, private)
+	if e.Options.Has(LayerSSOT) {
+		if err := e.exportSSOT(tmpDir); err != nil {
+			return fmt.Errorf("export ssot: %w", err)
+		}
 	}
 
 	// Export MCP
@@ -75,6 +143,17 @@ func (e *Exporter) Export() error {
 		return fmt.Errorf("create tarball: %w", err)
 	}
 
+	// Fail-closed: a shareable structure-only pack must not contain leaks.
+	if len(e.Options.Layers) == 1 && e.Options.Has(LayerStructure) {
+		findings, err := LintPath(tmpDir, nil)
+		if err != nil {
+			return fmt.Errorf("lint pack: %w", err)
+		}
+		if len(findings) > 0 {
+			return fmt.Errorf("structure pack has %d leak(s): %+v", len(findings), findings)
+		}
+	}
+
 	return nil
 }
 
@@ -84,7 +163,7 @@ func (e *Exporter) exportSkills(dst string) error {
 		return err
 	}
 
-	home, _ := os.UserHomeDir()
+	home := e.home()
 	var sourceSkillsDir string
 	switch e.SourceAgent {
 	case "hermes":
@@ -132,13 +211,13 @@ func (e *Exporter) exportSkills(dst string) error {
 	return nil
 }
 
-func (e *Exporter) exportMemory(dst string) error {
+func (e *Exporter) exportMemory(dst string, all bool) error {
 	memDir := filepath.Join(dst, "memory")
 	if err := os.MkdirAll(memDir, 0755); err != nil {
 		return err
 	}
 
-	home, _ := os.UserHomeDir()
+	home := e.home()
 	var sourceMemDir string
 	switch e.SourceAgent {
 	case "hermes":
@@ -153,7 +232,18 @@ func (e *Exporter) exportMemory(dst string) error {
 		return nil
 	}
 
-	// Walk source directory and copy files, tracking them in manifest
+	isMethodology := func(rel string) bool {
+		base := filepath.Base(rel)
+		for _, m := range MethodologyMemory {
+			if base == m {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Walk source directory and copy files, tracking them in manifest.
+	// When all is false, only the structure methodology files are copied.
 	return filepath.Walk(sourceMemDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -169,6 +259,13 @@ func (e *Exporter) exportMemory(dst string) error {
 
 		// Skip lock files
 		if strings.HasSuffix(relPath, ".lock") {
+			return nil
+		}
+
+		if !all && !isMethodology(relPath) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
@@ -193,13 +290,60 @@ func (e *Exporter) exportMemory(dst string) error {
 	})
 }
 
+func (e *Exporter) exportSecrets(dst string) error {
+	src := filepath.Join(e.home(), "secrets-central")
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		return nil
+	}
+	return copyTree(src, filepath.Join(dst, "secrets"), false)
+}
+
+func (e *Exporter) exportSSOT(dst string) error {
+	src := filepath.Join(e.home(), "Dev", "00-system")
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		return nil
+	}
+	return copyTree(src, filepath.Join(dst, "ssot"), true)
+}
+
+// copyTree copies a directory tree. When skipGit is true, .git is omitted.
+func copyTree(src, dst string, skipGit bool) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		if skipGit && info.IsDir() && info.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		target := filepath.Join(dst, rel)
+		if info.IsDir() {
+			return os.MkdirAll(target, info.Mode())
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, info.Mode())
+	})
+}
+
 func (e *Exporter) exportMCP(dst string) error {
 	mcpDir := filepath.Join(dst, "mcp")
 	if err := os.MkdirAll(mcpDir, 0755); err != nil {
 		return err
 	}
 
-	home, _ := os.UserHomeDir()
+	home := e.home()
 	var sourceMCPDir string
 	switch e.SourceAgent {
 	case "hermes":
@@ -240,7 +384,7 @@ func (e *Exporter) exportHooks(dst string) error {
 		return err
 	}
 
-	home, _ := os.UserHomeDir()
+	home := e.home()
 	var sourceHooksDir string
 	switch e.SourceAgent {
 	case "hermes":

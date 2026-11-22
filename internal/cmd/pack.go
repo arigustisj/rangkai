@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/arigustisj/rangkai/internal/pack"
 	"github.com/arigustisj/rangkai/internal/skill"
@@ -11,12 +12,18 @@ import (
 )
 
 var (
-	packProfile string
-	packAgent   string
-	packOutput  string
-	packSource  string
-	packDryRun  bool
-	packRules   string
+	packProfile     string
+	packAgent       string
+	packOutput      string
+	packSource      string
+	packDryRun      bool
+	packRules       string
+	packWithMemory  bool
+	packWithSecrets bool
+	packWithSSOT    bool
+
+	packLintSource string
+	packLintInfra  []string
 )
 
 // packReferenceProfile is the reference profile used for linking skills.
@@ -55,9 +62,22 @@ var packExportCmd = &cobra.Command{
 		sanitizer := pack.NewSanitizer(pack.DefaultSanitizeRules(), pack.NewManifest(packProfile, packAgent))
 		manifest := pack.NewManifest(packProfile, packAgent)
 
-		exporter := pack.NewExporter(packProfile, packAgent, packOutput, sanitizer, manifest, registry)
+		opts := pack.DefaultExportOptions()
+		if packWithMemory {
+			opts.Layers = append(opts.Layers, pack.LayerMemory)
+		}
+		if packWithSecrets {
+			opts.Layers = append(opts.Layers, pack.LayerSecrets)
+		}
+		if packWithSSOT {
+			opts.Layers = append(opts.Layers, pack.LayerSSOT)
+		}
+		exporter := pack.NewExporterWithOptions(packProfile, packAgent, packOutput, sanitizer, manifest, registry, opts)
 
 		fmt.Printf("📦 Exporting pack from profile '%s' (%s)...\n", packProfile, packAgent)
+		if packWithMemory || packWithSecrets || packWithSSOT {
+			fmt.Println("⚠️  Private layers included — do NOT share this pack publicly.")
+		}
 
 		if err := exporter.Export(); err != nil {
 			return fmt.Errorf("export failed: %w", err)
@@ -149,6 +169,36 @@ var packSanitizeCmd = &cobra.Command{
 	},
 }
 
+var packLintCmd = &cobra.Command{
+	Use:   "lint",
+	Short: "Scan a directory or pack for leaks (credentials, private memory, infra)",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if packLintSource == "" {
+			return fmt.Errorf("--source is required (a directory or a .tar.gz pack)")
+		}
+		var findings []pack.Finding
+		var err error
+		if strings.HasSuffix(packLintSource, ".tar.gz") {
+			findings, err = pack.LintPack(packLintSource, packLintInfra)
+		} else {
+			findings, err = pack.LintPath(packLintSource, packLintInfra)
+		}
+		if err != nil {
+			return fmt.Errorf("lint failed: %w", err)
+		}
+		if len(findings) == 0 {
+			fmt.Printf("✅ No leaks found in %s\n", packLintSource)
+			return nil
+		}
+		fmt.Printf("❌ %d leak(s) found in %s:\n", len(findings), packLintSource)
+		for _, f := range findings {
+			fmt.Printf("  - [%s] %s: %s\n", f.Kind, f.Path, f.Detail)
+		}
+		return fmt.Errorf("%d leak(s) found", len(findings))
+	},
+}
+
 var packOnboardCmd = &cobra.Command{
 	Use:   "onboard",
 	Short: "Interactive onboarding wizard for new team members",
@@ -181,11 +231,15 @@ func init() {
 	packCmd.AddCommand(packExportCmd)
 	packCmd.AddCommand(packImportCmd)
 	packCmd.AddCommand(packSanitizeCmd)
+	packCmd.AddCommand(packLintCmd)
 	packCmd.AddCommand(packOnboardCmd)
 
 	packExportCmd.Flags().StringVarP(&packProfile, "profile", "p", "personal", "Source profile name")
 	packExportCmd.Flags().StringVar(&packAgent, "agent", "hermes", "Source agent (hermes, claude-code, cursor)")
 	packExportCmd.Flags().StringVarP(&packOutput, "output", "o", "", "Output pack file (.tar.gz)")
+	packExportCmd.Flags().BoolVar(&packWithMemory, "with-memory", false, "Include personal memory (private layer)")
+	packExportCmd.Flags().BoolVar(&packWithSecrets, "with-secrets", false, "Include secrets-central (private layer)")
+	packExportCmd.Flags().BoolVar(&packWithSSOT, "with-ssot", false, "Include personal SSOT (private layer)")
 
 	packImportCmd.Flags().StringVarP(&packProfile, "profile", "p", "personal", "Target profile name")
 	packImportCmd.Flags().StringVar(&packAgent, "agent", "hermes", "Target agent (hermes, claude-code, cursor)")
@@ -194,6 +248,8 @@ func init() {
 	packSanitizeCmd.Flags().StringVar(&packRules, "rules", "default", "Sanitization rules (default, strict, minimal)")
 	packSanitizeCmd.Flags().StringVar(&packSource, "input", "", "Input directory to sanitize")
 	packSanitizeCmd.Flags().StringVar(&packOutput, "output", "", "Output directory for sanitized files")
+	packLintCmd.Flags().StringVar(&packLintSource, "source", "", "Directory or .tar.gz pack to scan")
+	packLintCmd.Flags().StringArrayVar(&packLintInfra, "infra-pattern", nil, "Extra infra regex to flag (repeatable)")
 
 	packOnboardCmd.Flags().StringVarP(&packProfile, "profile", "p", "new-hire", "Target profile name")
 	packOnboardCmd.Flags().StringVar(&packAgent, "agent", "hermes", "Target agent (hermes, claude-code, cursor)")

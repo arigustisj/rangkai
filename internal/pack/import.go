@@ -313,9 +313,17 @@ func (i *Importer) convertToClaudeSettings(yamlContent string) string {
 }
 
 func copyDir(src, dst string) error {
+	// Resolve a symlinked root so a skill dir that is itself a link is copied.
+	if resolved, err := filepath.EvalSymlinks(src); err == nil {
+		src = resolved
+	}
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+		// Never follow nested symlinks: they can point at directories (or cycle).
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
 		}
 
 		relPath, err := filepath.Rel(src, path)
