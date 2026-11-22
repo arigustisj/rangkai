@@ -66,6 +66,7 @@ Status legend: **Ready** means implemented, **Stub** means a placeholder still p
 | `eject` | Wipe the installed environment and secrets from this machine | Ready |
 | `push` | Encrypt and upload the environment to a private hub over SSH | Ready |
 | `pull` | Download and restore the environment from a private hub | Ready |
+| `bootstrap` | Provision a fresh machine: SSH key, hub alias, then pull | Ready |
 | `pack export` | Export a shareable, sanitized pack | Ready |
 | `pack import` | Import a pack into a target profile | Ready |
 | `pack sanitize` | Strip credentials and replace sensitive patterns | Ready |
@@ -128,6 +129,23 @@ RANGKAI_PASSPHRASE='your-passphrase' ./bin/rangkai pull --hub your-hub:rangkai-h
 ```
 
 `--hub` is an SCP target (`ssh-host:path`); an ssh_config alias works. `push` creates the hub directory if needed. `pull` inherits the restore guards: decrypt-first, `--force` to overwrite, path-traversal rejection. SSH runs in BatchMode with trust-on-first-use host keys and fails closed.
+
+## Fresh machine: bootstrap
+
+On a brand-new (borrowed) machine, after installing Rangkai:
+
+```bash
+# 1) Provision an SSH key + hub alias, and print the key to authorize
+./bin/rangkai bootstrap --hub you@your-hub:rangkai-hub --profile personal
+
+# 2) Authorize the printed public key on the hub (one time)
+ssh you@your-hub "mkdir -p ~/.ssh && echo '<public-key>' >> ~/.ssh/authorized_keys"
+
+# 3) Pull your encrypted environment
+./bin/rangkai pull --hub rangkai-personal:rangkai-hub --profile personal
+```
+
+`bootstrap` generates an ed25519 key at `~/.ssh/rangkai_<profile>` **without a passphrase** so `pull` is non-interactive — anyone with the machine can reach your hub, so treat that key as machine-scoped. Re-running `bootstrap` is safe: it reuses the key and never duplicates the `~/.ssh/config` stanza. Use `--no-pull` to only provision.
 
 ## Maintain the environment
 
