@@ -50,7 +50,7 @@ Status legend: **Ready** means implemented, **Stub** means a placeholder still p
 | --- | --- | :---: |
 | `init` | Create a profile with config, install and verify scripts | Ready |
 | `verify` | Health-check a profile | Ready |
-| `doctor` | Diagnose and fix environment issues | Stub |
+| `doctor` | Diagnose the profile (read-only, exits non-zero on failure) | Ready |
 | `add-skill` | Link a skill into the profile | Ready |
 | `list-skills` | List installed and available skills | Ready |
 | `remove-skill` | Remove a skill from the profile | Ready |
@@ -59,10 +59,10 @@ Status legend: **Ready** means implemented, **Stub** means a placeholder still p
 | `list-mcp` | List installed and available MCP servers | Ready |
 | `remove-mcp` | Remove an MCP server from the profile | Ready |
 | `sync-mcp` | Sync core MCP servers | Ready |
-| `switch-model` | Change the active model | Stub |
+| `switch-model` | Change the active model | Ready |
 | `backup` | Back up the full personal environment to an encrypted archive | Ready |
 | `restore` | Restore a personal environment from an encrypted archive | Ready |
-| `update` | Update Hermes, skills, and MCP servers | Stub |
+| `update` | Regenerate the profile artifacts from current settings | Ready |
 | `eject` | Wipe the installed environment and secrets from this machine | Ready |
 | `push` | Encrypt and upload the environment to a private hub over SSH | Ready |
 | `pull` | Download and restore the environment from a private hub | Ready |
@@ -129,6 +129,19 @@ RANGKAI_PASSPHRASE='your-passphrase' ./bin/rangkai pull --hub your-hub:rangkai-h
 
 `--hub` is an SCP target (`ssh-host:path`); an ssh_config alias works. `push` creates the hub directory if needed. `pull` inherits the restore guards: decrypt-first, `--force` to overwrite, path-traversal rejection. SSH runs in BatchMode with trust-on-first-use host keys and fails closed.
 
+## Maintain the environment
+
+```bash
+# Diagnose the profile (read-only; exits non-zero if anything fails)
+./bin/rangkai doctor --profile personal
+
+# Change the active model (edits config.yaml in place)
+./bin/rangkai switch-model ollama:llama3.1:8b --profile personal
+
+# Regenerate config/install/verify/hooks from the current settings
+./bin/rangkai update --profile personal
+```
+
 ## Environment variables
 
 - `RANGKAI_PASSPHRASE` (optional): passphrase for `backup`, `restore`, `push`, and `pull`, as an alternative to `--passphrase`.
@@ -137,7 +150,8 @@ Rangkai reads `HOME` to locate where the profile is written.
 
 ## Roadmap
 
-- Fill in the remaining stub commands: `doctor`, `switch-model`, `update`.
+- Encrypted workspace + crypto-erase eject.
+- Fresh-machine bootstrap (Tailscale auth + SSH key for `pull`).
 
 ## Contributing
 
