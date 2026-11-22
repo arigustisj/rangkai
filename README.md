@@ -17,6 +17,14 @@ Rangkai writes a complete agent profile for your stack and model: config, instal
 
 ## Quickstart
 
+**One-line install** (downloads the release binary, verifies its SHA256, installs to `~/.local/bin`):
+
+```bash
+curl -fsSL https://github.com/arigustisj/rangkai/releases/latest/download/install.sh | sh
+```
+
+**Or build from source**:
+
 ```bash
 git clone https://github.com/arigustisj/rangkai
 cd rangkai
@@ -115,7 +123,7 @@ Rangkai reads `HOME` to locate where the profile is written.
 ## Roadmap
 
 - Fill in the remaining stub commands: `doctor`, `switch-model`, `update`.
-- A one-line install script at `0xlzy.tech/install/rangkai` (planned, not yet available). Build from source for now.
+- Optional vanity URL `0xlzy.tech/install/rangkai` redirecting to the GitHub-hosted `install.sh` (a prod change on the Caddy/portfolio server, not yet done).
 - Layered public/private pack export with a sanitize lint for sharing.
 
 ## Contributing

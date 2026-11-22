@@ -13,7 +13,7 @@ MCP servers, hooks, and model routing in one command.
   rangkai init    # Setup new environment
   rangkai verify  # Health check
   rangkai doctor  # Diagnose issues`,
-	Version: "0.1.0",
+	Version: "0.2.0",
 }
 
 func Execute() error {
