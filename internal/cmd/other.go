@@ -18,22 +18,7 @@ var doctorCmd = &cobra.Command{
 	Short: "Diagnose and fix environment issues",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		home, _ := os.UserHomeDir()
-		dir := filepath.Join(home, ".hermes", "profiles", doctorProfile)
-		fmt.Println("🏥 Running diagnostics...")
-		failed := 0
-		for _, c := range config.Diagnose(dir) {
-			status := "PASS"
-			if !c.OK {
-				status = "FAIL"
-				failed++
-			}
-			fmt.Printf("   [%s] %s: %s\n", status, c.Name, c.Detail)
-		}
-		if failed > 0 {
-			return fmt.Errorf("%d check(s) failed", failed)
-		}
-		fmt.Println("✅ All checks passed")
-		return nil
+		return runDiagnostics(filepath.Join(home, ".hermes", "profiles", doctorProfile), "🏥 Running diagnostics...")
 	},
 }
 
