@@ -38,6 +38,18 @@ func TestLintPackMissing(t *testing.T) {
 	}
 }
 
+func TestLintIgnoresPlaceholderExamples(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "doc.md"), []byte(`Authorization: "Bearer sk-`+strings.Repeat("x", 24)+`"`), 0o600)
+	f, err := LintPath(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f) != 0 {
+		t.Fatalf("placeholder flagged: %v", f)
+	}
+}
+
 func TestLintPackFindsLeak(t *testing.T) {
 	src := t.TempDir()
 	os.WriteFile(filepath.Join(src, ".env"), []byte("K=1"), 0o600)

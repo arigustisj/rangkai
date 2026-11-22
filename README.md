@@ -69,19 +69,32 @@ Status legend: **Ready** means implemented, **Stub** means a placeholder still p
 | `pack export` | Export a shareable, sanitized pack | Ready |
 | `pack import` | Import a pack into a target profile | Ready |
 | `pack sanitize` | Strip credentials and replace sensitive patterns | Ready |
+| `pack lint` | Scan a directory or pack for leaks (credentials, private memory, infra) | Ready |
 | `pack onboard` | Onboard a new team member from a pack | Ready |
 
 Run `rangkai <command> -h` for flags. `init` takes `--profile` (personal, team-member, ci-bot), `--stack` (go, node, laravel, python), `--model` (`openrouter:...`, `ollama:...`, `vllm:...`), `--server`, `--shared-skills`, `--variant`, and `--force`.
 
 ## Packs: share the setup, keep the secrets
 
-A pack is a portable archive of a working environment.
+A pack is a portable archive of a working environment, built in layers.
 
-- `pack export` produces a **shareable** pack: sanitized structure, skills, hooks, and a public config template. Safe to distribute.
+- `pack export` produces a **shareable** pack by default: the `structure` layer (skills, hooks, a public config template, and the methodology memory files). Safe to distribute.
+- Personal layers are opt-in: `--with-memory`, `--with-secrets`, `--with-ssot`. They are private — Rangkai warns and never includes them silently. Encrypted carry of the whole environment stays with `backup`/`push`.
+- `pack lint` scans a directory or a `.tar.gz` pack for credentials, private memory, and (with `--infra-pattern`) your own infra markers; it exits non-zero on any finding.
+- A structure-only export is linted fail-closed: if a leak survives sanitization, the export is refused.
 - `pack import` applies a pack to a **target** profile.
 - `pack sanitize` strips credentials and replaces sensitive patterns before anything leaves your machine.
 
 Personal memory and credentials never belong in a shareable pack. Keep them in `memory/` (gitignored) and in the source profile's private settings.
+
+```bash
+# Share a structure-only pack (default) and verify it is clean
+./bin/rangkai pack export --profile personal --output structure.tar.gz
+./bin/rangkai pack lint --source structure.tar.gz
+
+# Include private layers for your own use (never share publicly)
+./bin/rangkai pack export --profile personal --output full.tar.gz --with-memory --with-secrets --with-ssot
+```
 
 ## Carry your environment between machines
 
@@ -125,8 +138,6 @@ Rangkai reads `HOME` to locate where the profile is written.
 ## Roadmap
 
 - Fill in the remaining stub commands: `doctor`, `switch-model`, `update`.
-- Vanity URL `0xlzy.tech/install/rangkai` redirects to the GitHub-hosted `install.sh` (a redirect service behind the portfolio Cloudflare Tunnel).
-- Layered public/private pack export with a sanitize lint for sharing.
 
 ## Contributing
 

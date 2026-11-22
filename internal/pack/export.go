@@ -143,6 +143,17 @@ func (e *Exporter) Export() error {
 		return fmt.Errorf("create tarball: %w", err)
 	}
 
+	// Fail-closed: a shareable structure-only pack must not contain leaks.
+	if len(e.Options.Layers) == 1 && e.Options.Has(LayerStructure) {
+		findings, err := LintPath(tmpDir, nil)
+		if err != nil {
+			return fmt.Errorf("lint pack: %w", err)
+		}
+		if len(findings) > 0 {
+			return fmt.Errorf("structure pack has %d leak(s): %+v", len(findings), findings)
+		}
+	}
+
 	return nil
 }
 

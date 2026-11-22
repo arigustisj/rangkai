@@ -33,6 +33,22 @@ var secretPatterns = []*regexp.Regexp{
 // forbiddenNames should never appear in a shared pack.
 var forbiddenNames = []string{".env", ".env.local", "id_rsa", "id_ed25519", "state.db", "state.db-shm", "state.db-wal"}
 
+// isPlaceholderMatch reports whether a regex match is an obvious placeholder
+// example (e.g. "sk-xxxx..." or "sk-xxx...xxxx") rather than a real credential.
+func isPlaceholderMatch(m string) bool {
+	s := strings.ToLower(m)
+	if strings.Contains(s, "xxx") || strings.Contains(s, "...") {
+		return true
+	}
+	if i := strings.Index(s, "-"); i >= 0 {
+		rest := s[i+1:]
+		if rest != "" && strings.Count(rest, string(rest[0])) == len(rest) {
+			return true
+		}
+	}
+	return false
+}
+
 // LintPath scans a directory for leaks. extraInfra adds user infra regexes.
 func LintPath(root string, extraInfra []string) ([]Finding, error) {
 	var findings []Finding
@@ -76,12 +92,12 @@ func LintPath(root string, extraInfra []string) ([]Finding, error) {
 		}
 		content := string(data)
 		for _, re := range secretPatterns {
-			if re.MatchString(content) {
+			if m := re.FindString(content); m != "" && !isPlaceholderMatch(m) {
 				findings = append(findings, Finding{Path: rel, Kind: "credential", Detail: re.String()})
 			}
 		}
 		for _, re := range extra {
-			if m := re.FindString(content); m != "" {
+			if m := re.FindString(content); m != "" && !isPlaceholderMatch(m) {
 				findings = append(findings, Finding{Path: rel, Kind: "infra", Detail: "matched " + re.String()})
 			}
 		}
