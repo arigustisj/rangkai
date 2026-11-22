@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 )
@@ -94,4 +95,72 @@ func UpdateModel(configPath, newModel string) error {
 		return fmt.Errorf("no model provider found in %s", configPath)
 	}
 	return os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), info.Mode())
+}
+
+// modelProvider extracts the provider value from a config.yaml body.
+func modelProvider(cfg string) string {
+	inModel := false
+	for _, ln := range strings.Split(cfg, "\n") {
+		if ln == "model:" {
+			inModel = true
+			continue
+		}
+		if !inModel {
+			continue
+		}
+		t := strings.TrimSpace(ln)
+		if strings.HasPrefix(t, "provider:") {
+			v := strings.TrimSpace(strings.TrimPrefix(t, "provider:"))
+			return strings.Trim(v, "\"")
+		}
+		if t != "" && !strings.HasPrefix(ln, " ") && !strings.HasPrefix(ln, "	") && !strings.HasPrefix(ln, "#") {
+			inModel = false
+		}
+	}
+	return ""
+}
+
+// Check is one diagnostic result.
+type Check struct {
+	Name   string
+	OK     bool
+	Detail string
+}
+
+// Diagnose runs read-only checks over a profile directory. It never mutates it.
+func Diagnose(profileDir string) []Check {
+	var out []Check
+	emit := func(name string, ok bool, detail string) {
+		out = append(out, Check{Name: name, OK: ok, Detail: detail})
+	}
+
+	info, err := os.Stat(profileDir)
+	emit("profile-dir", err == nil && info.IsDir(), profileDir)
+	if err != nil || !info.IsDir() {
+		for _, n := range []string{"config", "model", "skills", "mcp", "hooks"} {
+			emit(n, false, "profile missing")
+		}
+		return out
+	}
+
+	cfgPath := filepath.Join(profileDir, "config.yaml")
+	cfgData, cfgErr := os.ReadFile(cfgPath)
+	cfg := string(cfgData)
+	emit("config", cfgErr == nil, cfgPath)
+	provider := ""
+	if cfgErr == nil {
+		provider = modelProvider(cfg)
+	}
+	emit("model", provider != "", "provider: \""+provider+"\"")
+
+	entries, skillsErr := os.ReadDir(filepath.Join(profileDir, "skills"))
+	emit("skills", skillsErr == nil && len(entries) > 0, fmt.Sprintf("%d entries", len(entries)))
+
+	emit("mcp", cfgErr == nil && strings.Contains(cfg, "mcp:"), "config.yaml mcp section")
+
+	hookPath := filepath.Join(profileDir, "scripts", "pre-commit")
+	hinfo, herr := os.Stat(hookPath)
+	emit("hooks", herr == nil && !hinfo.IsDir() && hinfo.Mode()&0o111 != 0, hookPath)
+
+	return out
 }
