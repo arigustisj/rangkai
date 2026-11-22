@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/arigustisj/rangkai/internal/pack"
 	"github.com/arigustisj/rangkai/internal/skill"
@@ -20,6 +21,9 @@ var (
 	packWithMemory  bool
 	packWithSecrets bool
 	packWithSSOT    bool
+
+	packLintSource string
+	packLintInfra  []string
 )
 
 // packReferenceProfile is the reference profile used for linking skills.
@@ -165,6 +169,36 @@ var packSanitizeCmd = &cobra.Command{
 	},
 }
 
+var packLintCmd = &cobra.Command{
+	Use:   "lint",
+	Short: "Scan a directory or pack for leaks (credentials, private memory, infra)",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if packLintSource == "" {
+			return fmt.Errorf("--source is required (a directory or a .tar.gz pack)")
+		}
+		var findings []pack.Finding
+		var err error
+		if strings.HasSuffix(packLintSource, ".tar.gz") {
+			findings, err = pack.LintPack(packLintSource, packLintInfra)
+		} else {
+			findings, err = pack.LintPath(packLintSource, packLintInfra)
+		}
+		if err != nil {
+			return fmt.Errorf("lint failed: %w", err)
+		}
+		if len(findings) == 0 {
+			fmt.Printf("✅ No leaks found in %s\n", packLintSource)
+			return nil
+		}
+		fmt.Printf("❌ %d leak(s) found in %s:\n", len(findings), packLintSource)
+		for _, f := range findings {
+			fmt.Printf("  - [%s] %s: %s\n", f.Kind, f.Path, f.Detail)
+		}
+		return fmt.Errorf("%d leak(s) found", len(findings))
+	},
+}
+
 var packOnboardCmd = &cobra.Command{
 	Use:   "onboard",
 	Short: "Interactive onboarding wizard for new team members",
@@ -197,6 +231,7 @@ func init() {
 	packCmd.AddCommand(packExportCmd)
 	packCmd.AddCommand(packImportCmd)
 	packCmd.AddCommand(packSanitizeCmd)
+	packCmd.AddCommand(packLintCmd)
 	packCmd.AddCommand(packOnboardCmd)
 
 	packExportCmd.Flags().StringVarP(&packProfile, "profile", "p", "personal", "Source profile name")
@@ -213,6 +248,8 @@ func init() {
 	packSanitizeCmd.Flags().StringVar(&packRules, "rules", "default", "Sanitization rules (default, strict, minimal)")
 	packSanitizeCmd.Flags().StringVar(&packSource, "input", "", "Input directory to sanitize")
 	packSanitizeCmd.Flags().StringVar(&packOutput, "output", "", "Output directory for sanitized files")
+	packLintCmd.Flags().StringVar(&packLintSource, "source", "", "Directory or .tar.gz pack to scan")
+	packLintCmd.Flags().StringArrayVar(&packLintInfra, "infra-pattern", nil, "Extra infra regex to flag (repeatable)")
 
 	packOnboardCmd.Flags().StringVarP(&packProfile, "profile", "p", "new-hire", "Target profile name")
 	packOnboardCmd.Flags().StringVar(&packAgent, "agent", "hermes", "Target agent (hermes, claude-code, cursor)")
