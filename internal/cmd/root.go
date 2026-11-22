@@ -39,4 +39,5 @@ func init() {
 	rootCmd.AddCommand(ejectCmd)
 	rootCmd.AddCommand(pushCmd)
 	rootCmd.AddCommand(pullCmd)
+	rootCmd.AddCommand(bootstrapCmd)
 }

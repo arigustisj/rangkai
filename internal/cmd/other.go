@@ -112,6 +112,11 @@ func init() {
 	switchModelCmd.Flags().StringVarP(&switchModelProfile, "profile", "p", "personal", "Profile name")
 	doctorCmd.Flags().StringVarP(&doctorProfile, "profile", "p", "personal", "Profile name")
 	updateCmd.Flags().StringVarP(&updateProfile, "profile", "p", "personal", "Profile name")
+	bootstrapCmd.Flags().StringVar(&bootstrapHub, "hub", "", "Hub target ([user@]host:path)")
+	bootstrapCmd.Flags().StringVarP(&bootstrapProfile, "profile", "p", "personal", "Profile name")
+	bootstrapCmd.Flags().BoolVar(&bootstrapNoPull, "no-pull", false, "Only provision the key and alias; skip pulling")
+	bootstrapCmd.Flags().StringVar(&bootstrapPassphrase, "passphrase", "", "Decryption passphrase (or RANGKAI_PASSPHRASE)")
+	bootstrapCmd.Flags().BoolVar(&bootstrapForce, "force", false, "Overwrite an existing profile when pulling")
 }
 
 var (
@@ -145,6 +150,50 @@ var restoreCmd = &cobra.Command{
 		}
 		fmt.Println("Environment restored.")
 		return nil
+	},
+}
+
+var (
+	bootstrapHub        string
+	bootstrapProfile    string
+	bootstrapNoPull     bool
+	bootstrapPassphrase string
+	bootstrapForce      bool
+)
+
+var bootstrapCmd = &cobra.Command{
+	Use:   "bootstrap",
+	Short: "Provision a fresh machine: SSH key, hub alias, then pull the environment",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if bootstrapHub == "" {
+			return fmt.Errorf("--hub required ([user@]host:path)")
+		}
+		home, _ := os.UserHomeDir()
+		tgt, err := pack.ParseHubTarget(bootstrapHub, "")
+		if err != nil {
+			return err
+		}
+		alias, pub, err := pack.BootstrapProfile(tgt, bootstrapProfile)
+		if err != nil {
+			return fmt.Errorf("bootstrap: %w", err)
+		}
+		fmt.Printf("🔑 SSH key ready (no passphrase) for alias '%s'\n", alias)
+		fmt.Printf("📝 Hub alias written to ~/.ssh/config\n")
+		fmt.Printf("\n1) Authorize this public key on the hub:\n")
+		fmt.Printf("   ssh %s \"mkdir -p ~/.ssh && echo '%s' >> ~/.ssh/authorized_keys\"\n", tgt.Dest(), pub)
+		fmt.Printf("\n2) Then pull your environment:\n")
+		fmt.Printf("   rangkai pull --hub %s:%s --profile %s\n", alias, tgt.Path, bootstrapProfile)
+		if bootstrapNoPull {
+			return nil
+		}
+		pass := bootstrapPassphrase
+		if pass == "" {
+			pass = os.Getenv("RANGKAI_PASSPHRASE")
+		}
+		if pass == "" {
+			return fmt.Errorf("passphrase required to pull (--passphrase or RANGKAI_PASSPHRASE)")
+		}
+		return pack.PullFromHub(alias+":"+tgt.Path, bootstrapProfile, pass, home, bootstrapForce)
 	},
 }
 

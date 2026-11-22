@@ -47,6 +47,14 @@ func ParseHubTarget(s, alias string) (HubTarget, error) {
 	return t, nil
 }
 
+// Dest returns the ssh destination (user@host, or host).
+func (t HubTarget) Dest() string {
+	if t.User != "" {
+		return t.User + "@" + t.Host
+	}
+	return t.Host
+}
+
 // SSHPublicKey reads the public key as a single authorized-keys line.
 func (t HubTarget) SSHPublicKey(pubPath string) (string, error) {
 	b, err := os.ReadFile(pubPath)
