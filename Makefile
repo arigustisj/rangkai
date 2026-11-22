@@ -1,4 +1,4 @@
-.PHONY: build test lint clean install uninstall verify
+.PHONY: build test lint clean install uninstall verify release-build
 
 BINARY=rangkai
 BUILD_DIR=bin
@@ -8,6 +8,9 @@ build:
 	@echo "Building $(BINARY)..."
 	@go build -o $(BUILD_DIR)/$(BINARY) ./cmd/rangkai
 
+release-build:
+	@sh scripts/release.sh
+
 test:
 	@go test ./...
 
@@ -15,7 +18,7 @@ lint:
 	@golangci-lint run ./...
 
 clean:
-	@rm -rf $(BUILD_DIR)
+	@rm -rf $(BUILD_DIR) dist
 
 install: build
 	@echo "Installing to $(INSTALL_PATH)..."
